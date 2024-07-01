@@ -2,13 +2,13 @@
 name: Dart CI
 
 on:
-  # Run on PRs and pushes to the default branch.
   push:
     branches: [master]
   pull_request:
     branches: [master]
   schedule:
     - cron: "0 0 * * 0"
+  workflow_dispatch:
 
 env:
   PUB_ENVIRONMENT: bot.github
@@ -23,7 +23,7 @@ jobs:
       matrix:
         sdk: [stable]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1.0
         with:
           sdk: ${{ matrix.sdk }}
@@ -47,7 +47,7 @@ jobs:
         sdk: [stable]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1.0
         with:
           sdk: ${{ matrix.sdk }}
@@ -67,7 +67,7 @@ jobs:
       - name: Build
         run: dart compile exe bin/main.dart -o dartgit
       - name: "Upload Artifact"
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: dartgit
           path: dartgit
