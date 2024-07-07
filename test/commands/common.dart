@@ -119,7 +119,26 @@ Future<void> testGitCommand(
   Map<String, String> env = const {},
   bool shouldReturnError = false,
 }) async {
-  // hack: Untill we implement git fetch
+  if (command.startsWith('echo')) {
+    print(command);
+
+    var parts = command.split('>');
+    var file = parts[1].trim();
+    var content = parts[0].substring('echo'.length).trim();
+
+    var realFile = p.join(s.realGitDir, file);
+    var dartFile = p.join(s.dartGitDir, file);
+
+    print('RealFile: $realFile');
+    print('DartFile: $dartFile');
+
+    await File(realFile).writeAsString(content);
+    await File(dartFile).writeAsString(content);
+
+    return;
+  }
+
+  // hack: Until we implement git fetch
   var outputL = command.startsWith('fetch')
       ? (await runGitCommand(
           command,
@@ -134,16 +153,14 @@ Future<void> testGitCommand(
           env: env,
           shouldReturnError: shouldReturnError,
         );
+  var output = outputL.join('\n').trim().toLowerCase();
 
-  var output = outputL.join('\n').trim();
   var expectedOutput = await runGitCommand(
     command,
     s.realGitDir,
     env: env,
     shouldReturnError: shouldReturnError,
   );
-
-  output = output.toLowerCase();
   expectedOutput = expectedOutput.toLowerCase();
 
   if (!ignoreOutput) {
@@ -153,6 +170,7 @@ Future<void> testGitCommand(
       expect(expectedOutput.contains(output), true);
     }
   }
+
   await testRepoEquals(s.dartGitDir, s.realGitDir);
 }
 

@@ -35,26 +35,27 @@ Future<void> main(List<String> args) async {
 
 Future<int> mainWithExitCode(List<String> args) async {
   var runner = CommandRunner<int>('git', 'Distributed version control.')
-    ..addCommand(InitCommand())
     ..addCommand(AddCommand())
     ..addCommand(BranchCommand())
     ..addCommand(CatFileCommand())
     ..addCommand(CheckoutCommand())
+    ..addCommand(CommitCommand())
+    ..addCommand(DiffCommand())
+    ..addCommand(DiffTreeCommand())
     ..addCommand(DumpIndexCommand())
     ..addCommand(HashObjectCommand())
+    ..addCommand(InitCommand())
     ..addCommand(LogCommand())
-    ..addCommand(RemoteCommand())
-    ..addCommand(StatusCommand())
-    ..addCommand(RmCommand())
-    ..addCommand(ResetCommand())
-    ..addCommand(WriteTreeCommand())
+    ..addCommand(LsTreeCommand())
     ..addCommand(MergeBaseCommand())
     ..addCommand(MergeCommand())
-    ..addCommand(DiffTreeCommand())
-    ..addCommand(DiffCommand())
-    ..addCommand(ShowCommand())
     ..addCommand(MTimeBuilderCommand())
-    ..addCommand(LsTreeCommand());
+    ..addCommand(RemoteCommand())
+    ..addCommand(ResetCommand())
+    ..addCommand(RmCommand())
+    ..addCommand(ShowCommand())
+    ..addCommand(StatusCommand())
+    ..addCommand(WriteTreeCommand());
 
   try {
     return await runner.run(args) ?? 100;

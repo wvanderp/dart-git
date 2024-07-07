@@ -8,6 +8,7 @@ import 'package:async/async.dart' show NullStreamSink;
 import 'package:path/path.dart' as p;
 import 'package:process_run/process_run.dart';
 import 'package:process_run/shell.dart' as shell;
+import 'package:process_run/shell_run.dart';
 import 'package:test/test.dart';
 
 import 'package:dart_git/config.dart';
@@ -15,9 +16,10 @@ import 'package:dart_git/plumbing/git_hash.dart';
 import 'package:dart_git/plumbing/objects/commit.dart';
 
 import '../bin/main.dart' as git;
+import 'utils/split_string.dart';
 
 var inCI = Platform.environment["CI"] != null;
-var silenceShellOutput = !inCI;
+var silenceShellOutput = false;
 
 Future<String> runGitCommand(
   String command,
@@ -27,17 +29,20 @@ Future<String> runGitCommand(
   bool throwOnError = false,
 }) async {
   var sink = NullStreamSink<List<int>>();
+  print('git $command');
 
-  var results = await shell.run(
-    'git $command',
-    workingDirectory: dir,
-    includeParentEnvironment: false,
-    environment: env,
-    throwOnError: throwOnError,
-    // silence
-    stdout: silenceShellOutput ? sink : null,
-    stderr: silenceShellOutput ? sink : null,
-  );
+  var cmd = shellArgument('git $command');
+
+  print(cmd);
+
+  var results = await shell.run(cmd,
+      workingDirectory: dir,
+      includeParentEnvironment: false,
+      throwOnError: throwOnError,
+      // silence
+      stdout: silenceShellOutput ? sink : null,
+      stderr: silenceShellOutput ? sink : null,
+      runInShell: Platform.isWindows);
 
   expect(results.length, 1);
   var r = results.first;
@@ -150,12 +155,14 @@ done''';
   expect(c1, c2);
 
   // Test if the working dir is the same
-  var repo1FsEntities = Directory(repo1).listSync(recursive: true).toList();
-  repo1FsEntities = repo1FsEntities
+  var repo1FsEntities = Directory(repo1)
+      .listSync(recursive: true)
+      .toList()
       .where((e) => !e.path.startsWith(p.join(repo1, '.git/')))
       .toList();
-  var repo2FsEntities = Directory(repo2).listSync(recursive: true).toList();
-  repo2FsEntities = repo2FsEntities
+  var repo2FsEntities = Directory(repo2)
+      .listSync(recursive: true)
+      .toList()
       .where((e) => !e.path.startsWith(p.join(repo2, '.git/')))
       .toList();
 
@@ -167,25 +174,21 @@ done''';
   expect(repo1Files, repo2Files);
 
   for (var ent in repo1FsEntities) {
+    // check if the entry is a file
     var st = ent.statSync();
     if (st.type != FileSystemEntityType.file) {
       continue;
     }
+
     var path = ent.path.substring(repo1.length);
     var repo1FilePath = p.join(repo1, path);
     var repo2FilePath = p.join(repo2, path);
 
-    try {
-      var repo1File = File(repo1FilePath).readAsStringSync();
-      var repo2File = File(repo2FilePath).readAsStringSync();
+    print(repo1FilePath);
+    var repo1File = File(repo1FilePath).readAsStringSync();
+    var repo2File = File(repo2FilePath).readAsStringSync();
 
-      expect(repo1File, repo2File, reason: '$path is different');
-    } catch (e) {
-      var repo1File = File(repo1FilePath).readAsBytesSync();
-      var repo2File = File(repo2FilePath).readAsBytesSync();
-
-      expect(repo1File, repo2File, reason: '$path is different');
-    }
+    expect(repo1File, repo2File, reason: '$path is different');
   }
 
   // FIXME:
@@ -228,36 +231,42 @@ Future<List<String>> runDartGitCommand(
   var spec = ZoneSpecification(print: (_, __, ___, String msg) {
     printLog.add(msg);
   });
+
   var ret = await Zone.current.fork(specification: spec).run(() async {
     var prev = Directory.current;
 
     Directory.current = workingDir;
-    assert(!command.contains('"') && !command.contains("'"));
+
+    var commandParts = splitString(command);
+
     int returnCode = 5000;
     try {
-      returnCode = await git.mainWithExitCode(command.split(' '));
+      returnCode = await git.mainWithExitCode(commandParts);
     } catch (e) {
       printLog = ['$e'];
     }
+
     Directory.current = prev;
+
     return returnCode;
   });
+
+  if (!silenceShellOutput) {
+    for (var log in printLog) {
+      print('dartgit>  $log');
+    }
+  }
 
   expect(
     ret,
     isNot(5000),
     reason: "Command ran with an exception. This shouldn't happen",
   );
+
   if (!shouldReturnError) {
     expect(ret, 0);
   } else {
     expect(ret, isNot(0));
-  }
-
-  if (!silenceShellOutput) {
-    for (var log in printLog) {
-      print('dartgit>  $log');
-    }
   }
   return printLog;
 }
@@ -310,7 +319,7 @@ Future<String> cloneGittedFixture(String fixtureName, String newDirPath,
   await Directory('$newDirPath/.gitted').rename('$newDirPath/.git');
 
   await shell.run(
-    'git reset HEAD .',
+    'git reset HEAD -- .',
     workingDirectory: newDirPath,
     includeParentEnvironment: false,
     verbose: false,
